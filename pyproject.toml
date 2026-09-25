@@ -29,6 +29,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
+    "markupsafe>=2.0",
     "pymdown-extensions>=9",
 ]
 

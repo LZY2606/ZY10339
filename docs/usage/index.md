@@ -31,11 +31,13 @@ linking to their related documentation:
 - [`id`](#handling-errors): Give an identifier to your code blocks to help
     [debugging errors](#handling-errors), or to [prefix HTML ids](#html-ids).
 - [`idprefix`](#html-ids): Change or remove the prefix in front of HTML ids/hrefs.
+- [`maxoutput`](#limit-the-output-length): Limit the output length, marking truncated output with its original total length.
 - [`result`](#wrap-result-in-a-code-block): Choose the syntax highlight of your code block output.
 - [`returncode`](shell.md#expecting-a-non-zero-exit-code): Tell what return code is expected (shell code).
 - [`session`](#sessions): Execute code blocks within a named session, reusing previously defined variables, etc..
 - [`source`](#render-the-source-code-as-well): Render the source as well as the output.
 - [`tabs`](#change-the-titles-of-tabs): When rendering the source using tabs, choose the tabs titles.
+- [`timeout`](#limit-the-execution-time): Limit the execution time of a code block, in seconds.
 - [`width`](#change-the-console-width): Change the console width through the `COLUMNS` environment variable.
 - [`workdir`](#change-the-working-directory): Change the working directory.
 - [`title`](#additional-options): Title is a [Material for MkDocs][material] / [Zensical] option.
@@ -315,6 +317,34 @@ pwd
 ```
 ````
 
+## Limit the execution time
+
+To limit the execution time of a code block, use the `timeout` option,
+with a number of seconds as value (fractions allowed).
+When a shell command exceeds the timeout, its process is killed.
+When Python code exceeds the timeout, the execution is interrupted
+and any state the block had already defined in its session is rolled back,
+so it cannot leak into the next code block.
+
+```md
+```sh exec="1" timeout="5"
+make build
+```
+```
+
+## Limit the output length
+
+To limit the length of the output, use the `maxoutput` option,
+with a number of characters as value.
+Truncated output is followed by a marker
+stating the original total length of the output.
+
+```md
+```python exec="1" maxoutput="100"
+print("hello " * 100)
+```
+```
+
 ## Additional options
 
 If you are using [Material for MkDocs][material] or [Zensical],
@@ -423,6 +453,12 @@ greet("Ping")
 
 WARNING: **Limitation:**
 Sessions only work with Python and Pycon syntax for now.
+
+NOTE: **Isolation:**
+Sessions are scoped to a single document:
+two different documents using the same session name never share state.
+Shell code blocks always run in a fresh process,
+and never share state with Python sessions, even when using the same name.
 
 ## Literate Markdown
 

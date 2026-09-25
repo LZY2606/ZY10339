@@ -80,6 +80,27 @@ class ExecutionError(Exception):
         """The code returned by the execution of the code block."""
 
 
+def _session_store(md: Markdown) -> dict:
+    """Return the session store scoped to the given Markdown instance.
+
+    Sessions are stored per Markdown instance (per document),
+    so that two documents using the same session name never share state.
+    """
+    store = getattr(md, "_markdown_exec_sessions", None)
+    if store is None:
+        store = {}
+        md._markdown_exec_sessions = store  # type: ignore[attr-defined]
+    return store
+
+
+def _truncate_output(output: str, maxoutput: int) -> str:
+    """Truncate the output, keeping the original total length in a clear marker."""
+    if maxoutput > 0 and len(output) > maxoutput:
+        total = len(output)
+        return output[:maxoutput] + f"\n[markdown-exec] output truncated: showing {maxoutput} of {total} characters"
+    return output
+
+
 def _format_log_details(details: str, *, strip_fences: bool = False) -> str:
     if strip_fences:
         lines = details.split("\n")
@@ -106,6 +127,8 @@ def base_format(
     update_toc: bool = True,
     workdir: str | None = None,
     width: int | None = None,
+    timeout: float = 0,
+    maxoutput: int = 0,
     **options: Any,
 ) -> Markup:
     """Execute code and return HTML.
@@ -129,6 +152,9 @@ def base_format(
         update_toc: Whether to include generated headings
             into the Markdown table of contents (toc extension).
         workdir: The working directory to use for the execution.
+        timeout: Maximum execution time in seconds (0 means no timeout).
+        maxoutput: Maximum number of output characters to keep (0 means no limit).
+            When truncating, a marker with the original total length is appended.
         **options: Additional options passed from the formatter.
 
     Returns:
@@ -145,7 +171,15 @@ def base_format(
 
     try:
         with working_directory(workdir), console_width(width):
-            output = run(source_input, returncode=returncode, session=session, id=id, **extra)
+            output = run(
+                source_input,
+                returncode=returncode,
+                session=session,
+                id=id,
+                session_store=_session_store(md) if session else None,
+                timeout=timeout,
+                **extra,
+            )
     except ExecutionError as error:
         identifier = id or extra.get("title", "")
         identifier = identifier and f"'{identifier}' "
@@ -157,6 +191,8 @@ def base_format(
         )
         _logger.warning(log_message)
         return markdown.convert(str(error))
+
+    output = _truncate_output(output, maxoutput)
 
     if not output and not source:
         return Markup()
